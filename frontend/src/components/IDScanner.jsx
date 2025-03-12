@@ -42,17 +42,23 @@ const fetchWithConfig = async (endpoint, options = {}) => {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     },
-    credentials: 'include',
     ...options,
   };
 
   try {
+    console.log(`Making request to ${API_URL}${endpoint}`);
     const response = await fetch(`${API_URL}${endpoint}`, defaultOptions);
+    console.log(`Response status: ${response.status}`);
+    
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      console.error('Error response:', errorData);
       throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
     }
-    return await response.json();
+    
+    const data = await response.json();
+    console.log('Response data:', data);
+    return data;
   } catch (error) {
     console.error(`Fetch error for ${endpoint}:`, error);
     throw error;
@@ -73,7 +79,9 @@ const IDScanner = () => {
   useEffect(() => {
     const checkServerHealth = async () => {
       try {
+        console.log('Checking server health...');
         const data = await fetchWithConfig('/health');
+        console.log('Server health response:', data);
         setIsServerReady(true);
       } catch (error) {
         console.error('Server health check failed:', error);
