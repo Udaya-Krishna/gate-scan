@@ -19,8 +19,6 @@ if (!mongoUri) {
 
 // MongoDB connection options
 const mongooseOptions = {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
   serverSelectionTimeoutMS: 5000,
   socketTimeoutMS: 45000,
 };
@@ -63,8 +61,6 @@ let worker = null;
 async function initializeWorker() {
   try {
     worker = await createWorker();
-    await worker.loadLanguage('eng');
-    await worker.initialize('eng');
     console.log('Tesseract worker initialized successfully');
   } catch (error) {
     console.error('Error initializing Tesseract worker:', error);
