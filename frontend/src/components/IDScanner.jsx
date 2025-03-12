@@ -34,7 +34,7 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
   },
 }));
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 const IDScanner = () => {
   const webcamRef = useRef(null);
@@ -50,7 +50,7 @@ const IDScanner = () => {
   useEffect(() => {
     const checkServerHealth = async () => {
       try {
-        const response = await fetch(`${BACKEND_URL}/health`);
+        const response = await fetch(`${API_URL}/health`);
         const data = await response.json();
         setIsServerReady(data.worker === 'ready');
         if (data.worker !== 'ready') {
@@ -69,7 +69,7 @@ const IDScanner = () => {
 
   const fetchStoredStudents = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/students`);
+      const response = await fetch(`${API_URL}/api/students`);
       const data = await response.json();
       setStoredStudents(data);
     } catch (error) {
@@ -80,7 +80,7 @@ const IDScanner = () => {
   const handleConfirm = async () => {
     setIsStoringData(true);
     try {
-      const response = await fetch(`${BACKEND_URL}/api/students`, {
+      const response = await fetch(`${API_URL}/api/students`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -109,7 +109,7 @@ const IDScanner = () => {
 
   const extractDataFromImage = async (imageData) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/scan`, {
+      const response = await fetch(`${API_URL}/api/scan`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -126,8 +126,8 @@ const IDScanner = () => {
       setScannedData(data);
       setError(null);
     } catch (error) {
-      setError(error.message);
-      setScannedData(null);
+      console.error('Error:', error);
+      throw error;
     } finally {
       setIsLoading(false);
     }

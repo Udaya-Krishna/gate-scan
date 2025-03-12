@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const { createWorker } = require('tesseract.js');
+const multer = require('multer');
 require('dotenv').config();
 
 const Student = require('./models/Student');
@@ -51,9 +52,9 @@ connectToMongoDB();
 
 // Middleware
 app.use(cors({
-  origin: frontendUrl,
-  methods: ['GET', 'POST'],
-  credentials: true
+  origin: process.env.NODE_ENV === 'production' 
+    ? 'https://gate-scan.vercel.app'
+    : 'http://localhost:5173'
 }));
 app.use(express.json({ limit: '50mb' }));
 
