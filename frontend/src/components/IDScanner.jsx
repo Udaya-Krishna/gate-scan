@@ -36,6 +36,29 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
+const fetchWithConfig = async (endpoint, options = {}) => {
+  const defaultOptions = {
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    credentials: 'include',
+    ...options,
+  };
+
+  try {
+    const response = await fetch(`${API_URL}${endpoint}`, defaultOptions);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error(`Fetch error for ${endpoint}:`, error);
+    throw error;
+  }
+};
+
 const IDScanner = () => {
   const webcamRef = useRef(null);
   const [scannedData, setScannedData] = useState(null);
@@ -50,15 +73,11 @@ const IDScanner = () => {
   useEffect(() => {
     const checkServerHealth = async () => {
       try {
-        const response = await fetch(`${API_URL}/health`);
-        const data = await response.json();
-        setIsServerReady(data.worker === 'ready');
-        if (data.worker !== 'ready') {
-          setTimeout(checkServerHealth, 1000);
-        }
+        const data = await fetchWithConfig('/health');
+        setIsServerReady(true);
       } catch (error) {
         console.error('Server health check failed:', error);
-        setError('Server connection failed');
+        setError('Server connection failed. Please try again later.');
         setTimeout(checkServerHealth, 2000);
       }
     };
@@ -69,30 +88,21 @@ const IDScanner = () => {
 
   const fetchStoredStudents = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/students`);
-      const data = await response.json();
+      const data = await fetchWithConfig('/api/students');
       setStoredStudents(data);
     } catch (error) {
       console.error('Error fetching stored students:', error);
+      setError('Failed to fetch student list');
     }
   };
 
   const handleConfirm = async () => {
     setIsStoringData(true);
     try {
-      const response = await fetch(`${API_URL}/api/students`, {
+      await fetchWithConfig('/api/students', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(scannedData),
       });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to store data');
-      }
-
       await fetchStoredStudents();
       setShowConfirmDialog(false);
       setScannedData(null);
@@ -109,24 +119,16 @@ const IDScanner = () => {
 
   const extractDataFromImage = async (imageData) => {
     try {
-      const response = await fetch(`${API_URL}/api/scan`, {
+      const data = await fetchWithConfig('/api/scan', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ image: imageData }),
       });
       
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to scan ID card');
-      }
-
       setScannedData(data);
       setError(null);
     } catch (error) {
       console.error('Error:', error);
+      setError(error.message || 'Failed to scan ID card');
       throw error;
     } finally {
       setIsLoading(false);
