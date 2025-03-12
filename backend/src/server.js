@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const { createWorker } = require('tesseract.js');
 require('dotenv').config();
 
 const Student = require('./models/Student');
@@ -24,7 +25,7 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '50mb' }));
 
-// Basic health check endpoint
+// Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok',
@@ -47,8 +48,110 @@ async function connectToMongoDB() {
   }
 }
 
-// Start MongoDB connection
-connectToMongoDB();
+// Function to validate image data
+function validateImageData(imageData) {
+  if (!imageData || typeof imageData !== 'string') return false;
+  const base64Regex = /^data:image\/[a-z]+;base64,/i;
+  return base64Regex.test(imageData) || /^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)?$/.test(imageData);
+}
+
+// Function to extract data using regex pattern
+function extractData(text) {
+  if (typeof text !== 'string') throw new Error('Invalid text input');
+
+  const namePattern = /^[A-Z][a-z]+(?:\s[A-Z][a-z]+)*(?:\s[A-Z]+)?/m;
+  const branchPattern = /Branch:\s*([A-Za-z\s]+)/i;
+  const studentIdPattern = /ID:\s*(\w+)/i;
+
+  const nameMatch = text.match(namePattern);
+  const branchMatch = text.match(branchPattern);
+  const studentIdMatch = text.match(studentIdPattern);
+
+  return {
+    name: nameMatch ? nameMatch[0].trim() : '',
+    branch: branchMatch ? branchMatch[1].trim() : '',
+    studentId: studentIdMatch ? studentIdMatch[1].trim() : ''
+  };
+}
+
+// Endpoint for scanning ID cards with better memory management
+app.post('/api/scan', async (req, res) => {
+  let worker = null;
+  try {
+    const { image } = req.body;
+    if (!validateImageData(image)) {
+      return res.status(400).json({ error: 'Invalid image data provided' });
+    }
+
+    // Initialize worker for this request only
+    try {
+      worker = await createWorker();
+      console.log('Tesseract worker initialized for scan request');
+    } catch (initError) {
+      console.error('Error initializing Tesseract worker:', initError);
+      return res.status(503).json({ error: 'OCR service initialization failed' });
+    }
+
+    const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+    
+    try {
+      const { data: { text } } = await worker.recognize(Buffer.from(base64Data, 'base64'));
+      if (!text) {
+        return res.status(422).json({ error: 'Could not extract text from image' });
+      }
+
+      const extractedData = extractData(text);
+      if (!extractedData.name && !extractedData.branch && !extractedData.studentId) {
+        return res.status(422).json({ error: 'Could not identify ID card format' });
+      }
+
+      res.json({ ...extractedData, verified: false });
+    } catch (ocrError) {
+      console.error('OCR Error:', ocrError);
+      res.status(422).json({ error: 'Error processing image' });
+    }
+  } catch (error) {
+    console.error('Server Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    // Always cleanup worker
+    if (worker) {
+      try {
+        await worker.terminate();
+        console.log('Tesseract worker terminated');
+      } catch (termError) {
+        console.error('Error terminating worker:', termError);
+      }
+    }
+  }
+});
+
+// Endpoint for confirming and storing scanned data
+app.post('/api/students', async (req, res) => {
+  try {
+    const { name, branch, studentId } = req.body;
+
+    // Check if student already exists
+    const existingStudent = await Student.findOne({ studentId });
+    if (existingStudent) {
+      return res.status(409).json({ error: 'Student ID already exists' });
+    }
+
+    // Create new student record
+    const student = new Student({
+      name,
+      branch,
+      studentId,
+      verified: true
+    });
+
+    await student.save();
+    res.status(201).json(student);
+  } catch (error) {
+    console.error('Error storing student data:', error);
+    res.status(500).json({ error: 'Failed to store student data' });
+  }
+});
 
 // Endpoint to get all students
 app.get('/api/students', async (req, res) => {
@@ -60,6 +163,9 @@ app.get('/api/students', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch students' });
   }
 });
+
+// Start MongoDB connection
+connectToMongoDB();
 
 // Handle graceful shutdown
 process.on('SIGTERM', () => {
