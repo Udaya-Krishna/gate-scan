@@ -56,6 +56,11 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '50mb' }));
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', message: 'Server is running' });
+});
+
 // Initialize Tesseract worker
 let worker = null;
 async function initializeWorker() {
@@ -167,11 +172,6 @@ app.get('/api/students', async (req, res) => {
     console.error('Error fetching students:', error);
     res.status(500).json({ error: 'Failed to fetch students' });
   }
-});
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', worker: worker ? 'ready' : 'initializing' });
 });
 
 // Start the server
