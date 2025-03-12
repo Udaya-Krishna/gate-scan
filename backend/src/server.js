@@ -54,14 +54,24 @@ async function connectToMongoDB() {
 
 // Function to validate image data
 function validateImageData(imageData) {
-  if (!imageData || typeof imageData !== 'string') return false;
+  if (!imageData || typeof imageData !== 'string') {
+    console.error('Invalid image data type:', typeof imageData);
+    return false;
+  }
   const base64Regex = /^data:image\/[a-z]+;base64,/i;
-  return base64Regex.test(imageData) || /^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)?$/.test(imageData);
+  const isValid = base64Regex.test(imageData) || /^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)?$/.test(imageData);
+  console.log('Image validation:', isValid ? 'Valid' : 'Invalid');
+  return isValid;
 }
 
 // Function to extract data using regex pattern
 function extractData(text) {
-  if (typeof text !== 'string') throw new Error('Invalid text input');
+  if (typeof text !== 'string') {
+    console.error('Invalid text input type:', typeof text);
+    throw new Error('Invalid text input');
+  }
+
+  console.log('Extracting data from text:', text.substring(0, 100) + '...');
 
   const namePattern = /^[A-Z][a-z]+(?:\s[A-Z][a-z]+)*(?:\s[A-Z]+)?/m;
   const branchPattern = /Branch:\s*([A-Za-z\s]+)/i;
@@ -71,44 +81,57 @@ function extractData(text) {
   const branchMatch = text.match(branchPattern);
   const studentIdMatch = text.match(studentIdPattern);
 
-  return {
+  const result = {
     name: nameMatch ? nameMatch[0].trim() : '',
     branch: branchMatch ? branchMatch[1].trim() : '',
     studentId: studentIdMatch ? studentIdMatch[1].trim() : ''
   };
+
+  console.log('Extracted data:', result);
+  return result;
 }
 
 // Endpoint for scanning ID cards with better memory management
 app.post('/api/scan', async (req, res) => {
   let worker = null;
   try {
+    console.log('Received scan request');
     const { image } = req.body;
+    
     if (!validateImageData(image)) {
+      console.error('Invalid image data received');
       return res.status(400).json({ error: 'Invalid image data provided' });
     }
 
     // Initialize worker for this request only
     try {
+      console.log('Initializing Tesseract worker...');
       worker = await createWorker();
-      console.log('Tesseract worker initialized for scan request');
+      console.log('Tesseract worker initialized successfully');
     } catch (initError) {
       console.error('Error initializing Tesseract worker:', initError);
       return res.status(503).json({ error: 'OCR service initialization failed' });
     }
 
     const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+    console.log('Processing image data...');
     
     try {
       const { data: { text } } = await worker.recognize(Buffer.from(base64Data, 'base64'));
+      console.log('OCR completed, extracted text length:', text.length);
+      
       if (!text) {
+        console.error('No text extracted from image');
         return res.status(422).json({ error: 'Could not extract text from image' });
       }
 
       const extractedData = extractData(text);
       if (!extractedData.name && !extractedData.branch && !extractedData.studentId) {
+        console.error('No valid data found in extracted text');
         return res.status(422).json({ error: 'Could not identify ID card format' });
       }
 
+      console.log('Successfully processed image');
       res.json({ ...extractedData, verified: false });
     } catch (ocrError) {
       console.error('OCR Error:', ocrError);

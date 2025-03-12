@@ -117,24 +117,6 @@ const IDScanner = () => {
     setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
   }, []);
 
-  const extractDataFromImage = async (imageData) => {
-    try {
-      const data = await fetchWithConfig('/api/scan', {
-        method: 'POST',
-        body: JSON.stringify({ image: imageData }),
-      });
-      
-      setScannedData(data);
-      setError(null);
-    } catch (error) {
-      console.error('Error:', error);
-      setError(error.message || 'Failed to scan ID card');
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const capture = useCallback(() => {
     if (!isServerReady) {
       setError('Server is not ready yet. Please wait.');
@@ -144,15 +126,48 @@ const IDScanner = () => {
     if (webcamRef.current) {
       setIsLoading(true);
       setError(null);
-      const imageSrc = webcamRef.current.getScreenshot();
-      if (imageSrc) {
-        extractDataFromImage(imageSrc);
-      } else {
+      try {
+        const imageSrc = webcamRef.current.getScreenshot();
+        console.log('Image captured:', imageSrc ? 'Success' : 'Failed');
+        if (imageSrc) {
+          extractDataFromImage(imageSrc);
+        } else {
+          setIsLoading(false);
+          setError('Failed to capture image. Please try again.');
+        }
+      } catch (error) {
+        console.error('Camera capture error:', error);
         setIsLoading(false);
-        setError('Failed to capture image');
+        setError('Failed to access camera. Please check permissions.');
       }
+    } else {
+      setError('Camera not initialized. Please refresh the page.');
     }
   }, [isServerReady]);
+
+  const extractDataFromImage = async (imageData) => {
+    try {
+      console.log('Sending image to server...');
+      const data = await fetchWithConfig('/api/scan', {
+        method: 'POST',
+        body: JSON.stringify({ image: imageData }),
+      });
+      
+      console.log('Server response:', data);
+      if (!data || (!data.name && !data.branch && !data.studentId)) {
+        throw new Error('No valid data extracted from image');
+      }
+      
+      setScannedData(data);
+      setError(null);
+    } catch (error) {
+      console.error('Error processing image:', error);
+      setError(error.message || 'Failed to scan ID card. Please try again.');
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <Container maxWidth="sm" sx={{ py: 2 }}>
