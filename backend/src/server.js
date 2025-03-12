@@ -12,67 +12,62 @@ const port = process.env.PORT || 3001;
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 const mongoUri = process.env.MONGODB_URI;
 
-if (!mongoUri) {
-  console.error('MONGODB_URI is not defined in environment variables');
-  process.exit(1);
-}
-
-// MongoDB connection options
-const mongooseOptions = {
-  serverSelectionTimeoutMS: 5000,
-  socketTimeoutMS: 45000,
-};
-
-// Connect to MongoDB with retry logic
-async function connectToMongoDB() {
-  try {
-    await mongoose.connect(mongoUri, mongooseOptions);
-    console.log('Connected to MongoDB Atlas');
-  } catch (error) {
-    console.error('MongoDB connection error:', error);
-    console.log('Retrying connection in 5 seconds...');
-    setTimeout(connectToMongoDB, 5000);
-  }
-}
-
-// Handle MongoDB connection events
-mongoose.connection.on('error', (error) => {
-  console.error('MongoDB connection error:', error);
+// Start server first
+const server = app.listen(port, '0.0.0.0', () => {
+  console.log(`Server running at http://0.0.0.0:${port}`);
 });
-
-mongoose.connection.on('disconnected', () => {
-  console.log('MongoDB disconnected. Attempting to reconnect...');
-  setTimeout(connectToMongoDB, 5000);
-});
-
-// Initial connection
-connectToMongoDB();
 
 // Middleware
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? 'https://gate-scan.vercel.app'
-    : 'http://localhost:5173'
+    : 'http://localhost:5173',
+  credentials: true
 }));
 app.use(express.json({ limit: '50mb' }));
 
-// Health check endpoint
+// Health check endpoint that doesn't depend on other services
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Server is running' });
+  res.json({ 
+    status: 'ok',
+    message: 'Server is running',
+    mongo: mongoose.connection.readyState === 1 ? 'connected' : 'disconnecting',
+    tesseract: worker ? 'initialized' : 'initializing'
+  });
 });
 
-// Initialize Tesseract worker
+// Initialize services
 let worker = null;
+
+// MongoDB connection with better error handling
+async function connectToMongoDB() {
+  try {
+    await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    });
+    console.log('Connected to MongoDB Atlas');
+  } catch (error) {
+    console.error('MongoDB connection error:', error);
+    // Don't exit process, just log error
+    setTimeout(connectToMongoDB, 5000);
+  }
+}
+
+// Initialize Tesseract without crashing server
 async function initializeWorker() {
   try {
     worker = await createWorker();
     console.log('Tesseract worker initialized successfully');
   } catch (error) {
     console.error('Error initializing Tesseract worker:', error);
-    process.exit(1);
+    // Don't exit process, just log error and retry
+    setTimeout(initializeWorker, 5000);
   }
 }
 
+// Start services
+connectToMongoDB();
 initializeWorker();
 
 // Function to validate image data
@@ -172,11 +167,6 @@ app.get('/api/students', async (req, res) => {
     console.error('Error fetching students:', error);
     res.status(500).json({ error: 'Failed to fetch students' });
   }
-});
-
-// Start the server
-app.listen(port, '0.0.0.0', () => {
-  console.log(`Server running at http://0.0.0.0:${port}`);
 });
 
 // Handle graceful shutdown
