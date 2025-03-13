@@ -135,9 +135,12 @@ const IDScanner = () => {
       setIsLoading(true);
       setError(null);
       try {
+        console.log('Attempting to capture image...');
         const imageSrc = webcamRef.current.getScreenshot();
-        console.log('Image captured:', imageSrc ? 'Success' : 'Failed');
+        console.log('Image capture result:', imageSrc ? 'Success' : 'Failed');
+        
         if (imageSrc) {
+          console.log('Image data length:', imageSrc.length);
           extractDataFromImage(imageSrc);
         } else {
           setIsLoading(false);
@@ -155,17 +158,27 @@ const IDScanner = () => {
 
   const extractDataFromImage = async (imageData) => {
     try {
-      console.log('Sending image to server...');
+      console.log('Preparing to send image to server...');
+      const requestBody = { image: imageData };
+      console.log('Request body size:', JSON.stringify(requestBody).length);
+      
       const data = await fetchWithConfig('/api/scan', {
         method: 'POST',
-        body: JSON.stringify({ image: imageData }),
+        body: JSON.stringify(requestBody),
       });
       
-      console.log('Server response:', data);
-      if (!data || (!data.name && !data.branch && !data.studentId)) {
-        throw new Error('No valid data extracted from image');
+      console.log('Server response received:', data);
+      
+      if (!data) {
+        throw new Error('No response data received from server');
       }
       
+      if (!data.name && !data.branch && !data.studentId) {
+        console.log('No valid data found in response:', data);
+        throw new Error('No valid data extracted from image. Please try again with better lighting or positioning.');
+      }
+      
+      console.log('Successfully extracted data:', data);
       setScannedData(data);
       setError(null);
     } catch (error) {

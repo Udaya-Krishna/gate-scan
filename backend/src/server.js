@@ -58,6 +58,7 @@ function validateImageData(imageData) {
   const base64Regex = /^data:image\/[a-z]+;base64,/i;
   const isValid = base64Regex.test(imageData) || /^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)?$/.test(imageData);
   console.log('Image validation:', isValid ? 'Valid' : 'Invalid');
+  console.log('Image data length:', imageData.length);
   return isValid;
 }
 
@@ -68,7 +69,7 @@ function extractData(text) {
     throw new Error('Invalid text input');
   }
 
-  console.log('Extracting data from text:', text.substring(0, 100) + '...');
+  console.log('Extracting data from text:', text.substring(0, 200) + '...');
 
   const namePattern = /^[A-Z][a-z]+(?:\s[A-Z][a-z]+)*(?:\s[A-Z]+)?/m;
   const branchPattern = /Branch:\s*([A-Za-z\s]+)/i;
@@ -77,6 +78,12 @@ function extractData(text) {
   const nameMatch = text.match(namePattern);
   const branchMatch = text.match(branchPattern);
   const studentIdMatch = text.match(studentIdPattern);
+
+  console.log('Regex matches:', {
+    name: nameMatch ? nameMatch[0] : 'Not found',
+    branch: branchMatch ? branchMatch[1] : 'Not found',
+    studentId: studentIdMatch ? studentIdMatch[1] : 'Not found'
+  });
 
   const result = {
     name: nameMatch ? nameMatch[0].trim() : '',
@@ -114,8 +121,10 @@ app.post('/api/scan', async (req, res) => {
     console.log('Processing image data...');
     
     try {
+      console.log('Starting OCR process...');
       const { data: { text } } = await worker.recognize(Buffer.from(base64Data, 'base64'));
       console.log('OCR completed, extracted text length:', text.length);
+      console.log('First 200 characters of extracted text:', text.substring(0, 200));
       
       if (!text) {
         console.error('No text extracted from image');
@@ -125,14 +134,14 @@ app.post('/api/scan', async (req, res) => {
       const extractedData = extractData(text);
       if (!extractedData.name && !extractedData.branch && !extractedData.studentId) {
         console.error('No valid data found in extracted text');
-        return res.status(422).json({ error: 'Could not identify ID card format' });
+        return res.status(422).json({ error: 'Could not identify ID card format. Please ensure the image is clear and well-lit.' });
       }
 
       console.log('Successfully processed image');
       res.json({ ...extractedData, verified: false });
     } catch (ocrError) {
       console.error('OCR Error:', ocrError);
-      res.status(422).json({ error: 'Error processing image' });
+      res.status(422).json({ error: 'Error processing image. Please try again with a clearer image.' });
     }
   } catch (error) {
     console.error('Server Error:', error);
