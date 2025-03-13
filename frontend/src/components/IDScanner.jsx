@@ -34,7 +34,10 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
   },
 }));
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL;
+if (!API_URL) {
+  console.error('VITE_API_URL environment variable is not set');
+}
 
 const fetchWithConfig = async (endpoint, options = {}) => {
   const defaultOptions = {
