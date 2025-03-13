@@ -61,6 +61,9 @@ const fetchWithConfig = async (endpoint, options = {}) => {
     return data;
   } catch (error) {
     console.error(`Fetch error for ${endpoint}:`, error);
+    if (error.message.includes('Failed to fetch') || error.message.includes('ERR_CONNECTION_REFUSED')) {
+      throw new Error('Cannot connect to server. Please make sure the backend server is running.');
+    }
     throw error;
   }
 };
