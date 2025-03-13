@@ -18,15 +18,17 @@ const server = app.listen(port, '0.0.0.0', () => {
 
 // Middleware
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://gate-scan.vercel.app', 'https://gate-scan-git-main-udaya-krishnas-projects.vercel.app', 'http://localhost:5173']
-    : '*',
+  origin: true, // Allow all origins in development
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
   credentials: true,
   maxAge: 600
 }));
+
+// Add OPTIONS handling for preflight requests
+app.options('*', cors());
+
 app.use(express.json({ limit: '50mb' }));
 
 // Health check endpoint
