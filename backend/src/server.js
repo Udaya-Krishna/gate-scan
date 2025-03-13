@@ -18,7 +18,9 @@ const server = app.listen(port, '0.0.0.0', () => {
 
 // Middleware
 app.use(cors({
-  origin: '*',  // Allow all origins in development
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://gate-scan.vercel.app', 'http://localhost:5173']
+    : '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
