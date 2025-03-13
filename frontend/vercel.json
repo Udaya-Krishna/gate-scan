@@ -16,9 +16,6 @@
       ]
     }
   ],
-  "env": {
-    "VITE_API_URL": "https://gate-scan-backend.onrender.com"
-  },
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite"

@@ -34,9 +34,17 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
   },
 }));
 
+// Debug environment variables
+console.log('Environment variables:', {
+  VITE_API_URL: import.meta.env.VITE_API_URL,
+  NODE_ENV: import.meta.env.MODE,
+  BASE_URL: import.meta.env.BASE_URL
+});
+
 const API_URL = import.meta.env.VITE_API_URL;
 if (!API_URL) {
   console.error('VITE_API_URL environment variable is not set');
+  throw new Error('VITE_API_URL environment variable is not set');
 }
 
 const fetchWithConfig = async (endpoint, options = {}) => {
@@ -49,8 +57,9 @@ const fetchWithConfig = async (endpoint, options = {}) => {
   };
 
   try {
-    console.log(`Making request to ${API_URL}${endpoint}`);
-    const response = await fetch(`${API_URL}${endpoint}`, defaultOptions);
+    const url = `${API_URL}${endpoint}`;
+    console.log('Making request to:', url);
+    const response = await fetch(url, defaultOptions);
     console.log(`Response status: ${response.status}`);
     
     if (!response.ok) {
@@ -65,7 +74,7 @@ const fetchWithConfig = async (endpoint, options = {}) => {
   } catch (error) {
     console.error(`Fetch error for ${endpoint}:`, error);
     if (error.message.includes('Failed to fetch') || error.message.includes('ERR_CONNECTION_REFUSED')) {
-      throw new Error('Cannot connect to server. Please make sure the backend server is running.');
+      throw new Error(`Cannot connect to server at ${API_URL}. Please check if the server is running.`);
     }
     throw error;
   }
